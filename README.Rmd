@@ -17,5 +17,5 @@ database.
 ## Data Sources
 The data set is freely available for download at [The VPD Open Data
 Website](https://geodash.vpd.ca/opendata/).  Save the zip file and extract it
-into a directory called `data`. Ensure the data is named `crimedata_csv_all_years.csv`.
+into a directory called `data`. Ensure the data is named `crimedata_csv_all_years.csv`
 
