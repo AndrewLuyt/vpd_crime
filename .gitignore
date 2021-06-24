@@ -1,3 +1,6 @@
+# the data directory: don't distribute the raw data, PDF, etc.
+data/
+
 # History files
 .Rhistory
 .Rapp.history

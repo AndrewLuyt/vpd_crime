@@ -1,2 +1,16 @@
-# vpd_crime
-An exploration of the Vancouver Police's Department public crime database
+Crime in Vancouver
+================
+Andrew Luyt
+24/06/2021
+
+## Introduction
+
+An exploration of the Vancouver Police Department’s public crime
+database.
+
+## Data Sources
+
+The data set is freely available for download at [The VPD Open Data
+Website](https://geodash.vpd.ca/opendata/). Save the zip file and
+extract it into a directory called `data`. Ensure the data is named
+`crimedata_csv_all_years.csv`.
