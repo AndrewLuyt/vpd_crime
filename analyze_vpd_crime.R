@@ -5,6 +5,7 @@ library(tidyverse)
 
 # It's just faster to load Rdata than parse a CSV
 if (Sys.getenv('USERNAME') == "agl") {
+  library(gitcreds)
   load("data/crime.Rdata")
 } else {
   crime <- read.csv("data/crimedata_csv_all_years.csv")
