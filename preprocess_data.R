@@ -17,6 +17,7 @@ crime <- crime %>% filter(!is.na(X))
 # TODO: add a column NEIGHBOURHOOD and figure out how to classify where a point lies
 # TODO: find a shape file or something that defines Vancouver neighborhoods
 #       which I can add to a Tableau map
+
 coords <- cbind(crime$X, crime$Y)
 utm_coords <- vect(coords, crs="+proj=utm +zone=10 +datum=WGS84  +units=m")
 lat_lon <- project(utm_coords, "+proj=longlat +datum=WGS84")
