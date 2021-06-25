@@ -1,20 +1,17 @@
 library(tidyverse)
 
 # download the data yourself as described in the README
-#
+# and run preprocess_data.R, which will transform the data
+# slightly and remove some nulls
 
-# It's just faster to load Rdata than parse a CSV
-if (Sys.getenv('USERNAME') == "agl") {
-  library(gitcreds)
+# Load the .Rdata if it's there, for speed
+if (file.exists("data/crime.Rdata")) {
   load("data/crime.Rdata")
 } else {
-  crime <- read.csv("data/crimedata_csv_all_years.csv")
+  stop("Please run preprocess_data.R to create the required data")
 }
 
-# There are a small number of nulls in X/Y columns
-# Though they are all clustered in the "Vehicle Collision (with Injury)"
-# category, they represent less than 0.3% of that group and we will
-# simply discard them.
-crime <- crime %>% filter(!is.na(X))
+
+
 
 
