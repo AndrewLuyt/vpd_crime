@@ -13,7 +13,7 @@ getmode <- function(x) {
   ux[which.max(tabulate(match(x, ux)))]
 }
 
-crime <-read.csv(CRIMEDATA)
+crime <- read.csv(CRIMEDATA)
 
 # There are a small number of nulls in X/Y columns
 # Though they are all clustered in the "Vehicle Collision (with Injury)"
@@ -46,6 +46,7 @@ write.csv(crime, file = "data/processed_crime.csv")
 
 # read geoJSON data into a dataframe-like object
 # the 22 features are the 22 neighbourhoods
+<<<<<<< HEAD
 # TODO: the crime dataset includes 2 extra neighbourhoods (Musqueam and Stanley Park)
 # that are not included in the official vancouver neighbourhood boundaries geodata.
 # Can you find shapefiles or whatever for these? For now, drop them from the
@@ -69,5 +70,6 @@ neighbourhoods <- arrange(neighbourhoods, "name")
 
 #top_crimes_sf <- inner_join(top_crimes, neighbourhoods, by = c("neighbourhood" = "name"))
 # this is unenlightening: top crime everywhere is theft, mostly from vehicles.
+
 ggplot(data = top_crimes_sf) +
   geom_sf(aes(geometry = geometry, fill=top_crime), col='white')
