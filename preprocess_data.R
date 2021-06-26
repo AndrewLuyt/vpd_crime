@@ -4,6 +4,8 @@
 library(tidyverse)
 library(terra)     # to convert UTM coordinates to Latitude/Longitude
 library(sf)        # Simple Features (geographical objects): for neighbourhood maps
+library(ggrepel)
+
 CRIMEDATA <- "data/crimedata_csv_all_years.csv"
 SHAPEDATA <- "data/vancouver_neighbourhood_boundaries_geodata/local-area-boundary.geojson"
 
@@ -46,7 +48,7 @@ write.csv(crime, file = "data/processed_crime.csv")
 
 # read geoJSON data into a dataframe-like object
 # the 22 features are the 22 neighbourhoods
-<<<<<<< HEAD
+
 # TODO: the crime dataset includes 2 extra neighbourhoods (Musqueam and Stanley Park)
 # that are not included in the official vancouver neighbourhood boundaries geodata.
 # Can you find shapefiles or whatever for these? For now, drop them from the
@@ -65,11 +67,25 @@ top_crimes <- crime %>%
 
 # add a new attribute column to the geodata: top_crime
 # Sort to match top_crimes
-top_crimes <- arrange(top_crimes, "neighbourhood")
-neighbourhoods <- arrange(neighbourhoods, "name")
+#top_crimes <- arrange(top_crimes, "neighbourhood")
+#neighbourhoods <- arrange(neighbourhoods, "name")
 
-#top_crimes_sf <- inner_join(top_crimes, neighbourhoods, by = c("neighbourhood" = "name"))
+# IMPORTANT: when joining an sf object to a dataframe, ensure the first object
+# in the pipe is the sf object. Encountered a bug here.
+top_crimes_sf <- neighbourhoods %>% inner_join(top_crimes, by=c("name" = "neighbourhood"))
 # this is unenlightening: top crime everywhere is theft, mostly from vehicles.
 
 ggplot(data = top_crimes_sf) +
-  geom_sf(aes(geometry = geometry, fill=top_crime), col='white')
+  geom_sf(aes(geometry = geometry, fill=top_crime), col='white') +
+  #geom_sf_label(aes(label = name), cex = 3) +
+# there is not a geom_sf_label_repel function, so we need to use
+# the basic one and add a few elements
+# https://www.johan-rosa.com/2019/11/13/creating-maps-with-sf-and-ggplot2/
+ggrepel::geom_label_repel(
+  aes(label = name, geometry = geometry),
+  stat = "sf_coordinates",
+  min.segment.length = 0,   # line segment connecting label with center of polygon
+  label.size = NA,          # remove border
+  # force = 3
+)
+
