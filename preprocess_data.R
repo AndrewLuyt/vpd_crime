@@ -4,12 +4,12 @@
 library(tidyverse)
 library(terra)     # to convert UTM coordinates to Latitude/Longitude
 library(sf)        # Simple Features (geographical objects): for neighbourhood maps
-library(ggrepel)
+library(ggrepel)   # automatically move map labels so they don't overlap
 
 CRIMEDATA <- "data/crimedata_csv_all_years.csv"
 SHAPEDATA <- "data/vancouver_neighbourhood_boundaries_geodata/local-area-boundary.geojson"
 
-# most common result in a vector
+# statistical mode: works for strings too
 getmode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
@@ -32,13 +32,18 @@ coords <- cbind(crime$X, crime$Y)
 utm_coords <- vect(coords, crs="+proj=utm +zone=10 +datum=WGS84  +units=m")
 lat_lon <- project(utm_coords, "+proj=longlat +datum=WGS84")
 extracted_lat_lon <- geom(lat_lon)[, c("x", "y")]
+
+# Musqueam is geographically in Dunbar-Southlands and has a policing
+# arrangement with VPD. For mapping purposes, convert Musqueam into D-S incidents
 crime <- crime %>%
-  mutate(latitude = extracted_lat_lon[,'y'], longitude = extracted_lat_lon[,'x']) %>%
-  select(TYPE, YEAR, MONTH, DAY, HOUR, MINUTE, HUNDRED_BLOCK, NEIGHBOURHOOD, latitude, longitude) %>%
+  mutate(x = extracted_lat_lon[,'x'],
+         y = extracted_lat_lon[,'y'],
+         NEIGHBOURHOOD = replace(NEIGHBOURHOOD, which(NEIGHBOURHOOD == 'Musqueam'), "Dunbar-Southlands")) %>%
+  select(TYPE, YEAR, MONTH, DAY, HOUR, MINUTE, HUNDRED_BLOCK, NEIGHBOURHOOD, x, y) %>%
   rename_with(tolower) %>%
   rename(crime_type = type) %>%
-  # TODO: see below, search for Musqueam
-  filter(neighbourhood != 'Musqueam' & neighbourhood != 'Stanley Park')
+  # We have no map for Stanley Park
+  filter(neighbourhood != 'Stanley Park')
 
 # this is speedier to load
 save(crime, file = 'data/crime.Rdata')
@@ -49,20 +54,17 @@ write.csv(crime, file = "data/processed_crime.csv")
 # read geoJSON data into a dataframe-like object
 # the 22 features are the 22 neighbourhoods
 
-# TODO: the crime dataset includes 2 extra neighbourhoods (Musqueam and Stanley Park)
-# that are not included in the official vancouver neighbourhood boundaries geodata.
-# Can you find shapefiles or whatever for these? For now, drop them from the
-# crime dataset
+# Ensure neighbourhood names match the geoJSON data
 neighbourhoods <- st_read(SHAPEDATA)
 neighbourhoods$name[neighbourhoods$name == 'Arbutus-Ridge'] <- 'Arbutus Ridge'
 neighbourhoods$name[neighbourhoods$name == 'Downtown'] <- 'Central Business District'
 
-
 # calculate top crimes
 # TODO: when we join it ceases to be an sf object? geometry col seems to vanish
+n_crimes = length(crime$crime_type)
 top_crimes <- crime %>%
   group_by(neighbourhood) %>%
-  summarise(top_crime = getmode(crime_type)) %>%
+  summarise(top_crime = getmode(crime_type), crime_proportion = n() / n_crimes) %>%
   arrange(neighbourhood)
 
 # add a new attribute column to the geodata: top_crime
@@ -72,10 +74,11 @@ top_crimes <- crime %>%
 
 # IMPORTANT: when joining an sf object to a dataframe, ensure the first object
 # in the pipe is the sf object. Encountered a bug here.
-top_crimes_sf <- neighbourhoods %>% inner_join(top_crimes, by=c("name" = "neighbourhood"))
+neighbourhoods <- neighbourhoods %>% inner_join(top_crimes, by=c("name" = "neighbourhood"))
 # this is unenlightening: top crime everywhere is theft, mostly from vehicles.
 
-ggplot(data = top_crimes_sf) +
+ggplot(data = neighbourhoods) +
+  # geom_sf(aes(geometry = geometry, fill=crime_proportion), col='white') +
   geom_sf(aes(geometry = geometry, fill=top_crime), col='white') +
   #geom_sf_label(aes(label = name), cex = 3) +
 # there is not a geom_sf_label_repel function, so we need to use

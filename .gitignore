@@ -6,6 +6,8 @@ todo.txt
 required-packages-libraries.txt
 # a script file where I try out things
 test.R
+# reading material
+resources/
 
 # History files
 .Rhistory
