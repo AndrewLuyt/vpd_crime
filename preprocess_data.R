@@ -1,15 +1,16 @@
-# a utility to remove nulls from the data and save it as
-# an Rdata file for speedier loading
+# a utility to preprocess data from the VPD crimes dataset, the Vancouver
+# neighbourhoods dataset, and (TODO) the Vancouver Census dataset,
+# and then save it in various formats for euse in other contexts, like
+# mapping in R or Tableau.
 
 library(tidyverse)
-library(terra)     # to convert UTM coordinates to Latitude/Longitude
 library(sf)        # Simple Features (geographical objects): for neighbourhood maps
 library(ggrepel)   # automatically move map labels so they don't overlap
 
 CRIMEDATA <- "data/crimedata_csv_all_years.csv"
 SHAPEDATA <- "data/vancouver_neighbourhood_boundaries_geodata/local-area-boundary.geojson"
 
-# statistical mode: works for strings too
+# the mode (from statistics): works for strings too
 getmode <- function(vec) {
   uv <- unique(vec)
   uv[which.max(tabulate(match(vec, uv)))]
@@ -19,7 +20,8 @@ getmodecount <- function(vec) {
   max(table(vec))
 }
 
-crime <- read.csv(CRIMEDATA)
+# LOAD AND PROCESS VPD CRIME DATASET ###################################
+crime <- read_csv(CRIMEDATA)
 
 # There are a small number of nulls in X/Y columns
 # Though they are all clustered in the "Vehicle Collision (with Injury)"
@@ -31,30 +33,19 @@ crime <- read.csv(CRIMEDATA)
 # the actual neighbourhood
 crime <- crime %>% filter(!is.na(X) & NEIGHBOURHOOD != "")
 
-# replace UTM coordinates with Lat/Long: this helps with Tableau mapping
-coords <- cbind(crime$X, crime$Y)
-utm_coords <- vect(coords, crs="+proj=utm +zone=10 +datum=WGS84  +units=m")
-lat_lon <- project(utm_coords, "+proj=longlat +datum=WGS84")
-extracted_lat_lon <- geom(lat_lon)[, c("x", "y")]
-
 # By the geoJSON data, Musqueam territory is geographically inside
 # Dunbar-Southlands. The band has a policing arrangement with VPD,
 # and incidents are recorded as "Musqueam".
 # For mapping purposes, fold Musqueam into D-S incidents.
 crime <- crime %>%
-  mutate(x = extracted_lat_lon[,'x'],
-         y = extracted_lat_lon[,'y'],
-         NEIGHBOURHOOD = replace(NEIGHBOURHOOD,
+  mutate(NEIGHBOURHOOD = replace(NEIGHBOURHOOD,
                                  which(NEIGHBOURHOOD == 'Musqueam'),
                                  "Dunbar-Southlands")) %>%
-  select(TYPE, YEAR, MONTH, DAY, HOUR, MINUTE, HUNDRED_BLOCK, NEIGHBOURHOOD, x, y) %>%
+  select(TYPE, YEAR, MONTH, DAY, HOUR, MINUTE, HUNDRED_BLOCK, NEIGHBOURHOOD, X, Y) %>%
   rename_with(tolower) %>%
   rename(crime_type = type) %>%
   # We have no map for Stanley Park
   filter(neighbourhood != 'Stanley Park')
-
-# remove temp variables
-rm(coords, utm_coords, lat_lon, extracted_lat_lon)
 
 # group the 11 crimes into 6 more general categories to make vis's simpler
 old <- sort(unique(crime$crime_type))
@@ -65,11 +56,7 @@ new <- c('Break and Enter', 'Break and Enter', 'Homicide', 'Mischief',
 crime$general_crime_type <- factor(crime$crime_type, old, new)
 rm(new, old)
 
-# a preprocessed binary file is speedier to load than a CSV
-save(crime, file = 'data/crime.Rdata')
-# a CSV for use in Tableau
-write.csv(crime, file = "data/processed_crime.csv")
-
+# LOAD Vancouver neighbourhood maps ###################################
 # read geoJSON data into a dataframe-like object
 # the 22 features are the 22 neighbourhoods
 # Ensure neighbourhood names match the geoJSON data
@@ -77,6 +64,7 @@ neighbourhoods <- st_read(SHAPEDATA)
 neighbourhoods$name[neighbourhoods$name == 'Arbutus-Ridge'] <- 'Arbutus Ridge'
 neighbourhoods$name[neighbourhoods$name == 'Downtown'] <- 'Central Business District'
 
+# TOP CRIMES ###########################################
 # calculate top crimes and add to neighbourhoods
 # This seems unenlightening: everywhere, it's theft.
 n_crimes = length(crime$crime_type)
@@ -87,6 +75,8 @@ top_crimes <- crime %>%
             p_top_crime = n_top_crime / n(),
             total_incidents = n()) %>%
   arrange(neighbourhood)
+
+# Attach this information to the neighbourhoods
 # IMPORTANT: when joining an sf object to a dataframe, ensure the first object
 # in the pipe is the sf object. Encountered a bug here.
 neighbourhoods <- inner_join(neighbourhoods, top_crimes, by=c("name" = "neighbourhood"))
@@ -99,6 +89,7 @@ top_nontheft_crimes <- crime %>%
   summarise(top_nontheft_crime = getmode(crime_type),
             n_top_nontheft_crime = getmodecount(crime_type)) %>%
   arrange(neighbourhood)
+
 # top_crimes contains the neighbourhood-specific number of incidents.
 # If we calculated that after filtering out 'Theft' we would have the wrong n.
 top_nontheft_crimes <-
@@ -109,6 +100,7 @@ top_nontheft_crimes <-
 top_nontheft_crimes$p_top_nontheft_crime <-
   top_nontheft_crimes$n_top_nontheft_crime / top_nontheft_crimes$total_incidents
 
+# Attach top_nontheft_crimes to the neighbourhoods dataset
 # IMPORTANT: when joining an sf object to a dataframe, ensure the first object
 # in the pipe is the sf object. Encountered a bug here.
 neighbourhoods <-
@@ -116,34 +108,28 @@ neighbourhoods <-
              top_nontheft_crimes,
              by=c("name" = "neighbourhood"))
 
-ggplot(data = neighbourhoods) +
-  # geom_sf(aes(geometry = geometry, fill=crime_proportion), col='white') +
-  geom_sf(aes(geometry = geometry, fill=top_crime), col='white') +
-  #geom_sf_label(aes(label = name), cex = 3) +
-# there is not a geom_sf_label_repel function, so we need to use
-# the basic one and add a few elements
-# https://www.johan-rosa.com/2019/11/13/creating-maps-with-sf-and-ggplot2/
-ggrepel::geom_label_repel(
-  # % of ALL city crime, NOT THE NEIGHBOURHOOD CRIME
-  aes(label = round(p_top_crime * 100, 1), geometry = geometry),
-  stat = "sf_coordinates",
-  min.segment.length = 0,   # line segment connecting label with center of polygon
-  label.size = NA,          # remove border
-  # force = 3
-)
+# CREATE SF OBJECT FROM CRIMES DATASET ################################
+# We need a geometry column to do this.
+# The geometry is the Point for every crime location, stored in the VPD
+# dataset as X,Y coordinates in the UTM 10 CRS (Coordinate Reference System)
+#
+# First create sf Points for the crime locations, NB: capital-M Map
+points <- lapply(Map(c, crime$x, crime$y), st_point)
+# Make the geometry column, an sfc object: Simple Feature Collection of Points.
+UTM.10 = st_crs(32610)
+geometry <- st_sfc(points, crs = UTM.10)
+# Make the sf (Simple Feature) object.  Contains the geometry which locates
+# crime points and 10 attributes describing each one.
+crimegeom <- st_sf(crime, geometry)
+# Tableau likes lon/lat coordinates, not UTM. Convert to NAD83.
+crimegeom <- st_transform(crimegeom, 4269)
+rm(geometry, points, UTM.10)
 
-ggplot(data = neighbourhoods) +
-  # geom_sf(aes(geometry = geometry, fill=crime_proportion), col='white') +
-  geom_sf(aes(geometry = geometry, fill=top_nontheft_crime), col='white') +
-  #geom_sf_label(aes(label = name), cex = 3) +
-  # there is not a geom_sf_label_repel function, so we need to use
-  # the basic one and add a few elements
-  # https://www.johan-rosa.com/2019/11/13/creating-maps-with-sf-and-ggplot2/
-  ggrepel::geom_label_repel(
-    aes(label = round(p_top_nontheft_crime * 100, 1), geometry = geometry),
-    stat = "sf_coordinates",
-    min.segment.length = 0,   # line segment connecting label with center of polygon
-    label.size = NA,          # remove border
-    # force = 3
-  )
-
+# SAVE PROCESSED DATA ################################################
+# a preprocessed binary file is speedier to load than a CSV
+save(crimegeom, file = 'data/crimegeom.Rdata')
+# keep a geoJSON file too
+st_write(obj = crimegeom, dsn = 'data/crimegeom.geojson', append=FALSE)
+# a CSV for use in Tableau
+# TODO: extract the lon/lat from the geometry before exporting
+#write.csv(crime, file = "data/processed_crime.csv")
