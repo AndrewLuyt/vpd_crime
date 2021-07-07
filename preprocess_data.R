@@ -56,6 +56,8 @@ new <- c('Break and Enter', 'Break and Enter', 'Homicide', 'Mischief',
 crime$general_crime_type <- factor(crime$crime_type, old, new)
 rm(new, old)
 
+
+
 # LOAD Vancouver neighbourhood maps ###################################
 # read geoJSON data into a dataframe-like object
 # the 22 features are the 22 neighbourhoods
@@ -127,9 +129,12 @@ rm(geometry, points, UTM.10)
 
 # SAVE PROCESSED DATA ################################################
 # a preprocessed binary file is speedier to load than a CSV
+save(crime, file = 'data/crime.Rdata')
 save(crimegeom, file = 'data/crimegeom.Rdata')
-# keep a geoJSON file too
-st_write(obj = crimegeom, dsn = 'data/crimegeom.geojson', append=FALSE)
+save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
+# keep a geoJSON file too. Delete the old version first, else st_write
+# apparently reads the entire file first (slow)
+st_write(obj = crimegeom, dsn = 'data/crimegeom.geojson', delete_dsn = TRUE)
 # a CSV for use in Tableau
 # TODO: extract the lon/lat from the geometry before exporting
 #write.csv(crime, file = "data/processed_crime.csv")
