@@ -1,7 +1,7 @@
 # the data directory: don't distribute the raw data, PDF, etc.
 data/
 # my personal todo list for the project
-todo.txt
+todo.Rmd
 # my personal log of things installed: R and Ubuntu packages
 required-packages-libraries.txt
 # a script file where I try out things
