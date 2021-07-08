@@ -5,7 +5,6 @@
 
 library(tidyverse)
 library(sf)        # Simple Features (geographical objects): for neighbourhood maps
-library(ggrepel)   # automatically move map labels so they don't overlap
 
 CRIMEDATA <- "data/crimedata_csv_all_years.csv"
 SHAPEDATA <- "data/vancouver_neighbourhood_boundaries_geodata/local-area-boundary.geojson"
@@ -22,16 +21,6 @@ getmodecount <- function(vec) {
 
 # LOAD AND PROCESS VPD CRIME DATASET ###################################
 crime <- read_csv(CRIMEDATA)
-
-# There are a small number of nulls in X/Y columns
-# Though they are all clustered in the "Vehicle Collision (with Injury)"
-# category, they represent less than 0.3% of that group and we will
-# simply discard them.
-# TODO: there are a small number of blank neighbourhood values too. Some
-# correspond with the blank coordinates but some do have block locations.
-# For now we just discard them, but later we might be able to extract
-# the actual neighbourhood
-crime <- crime %>% filter(!is.na(X) & NEIGHBOURHOOD != "")
 
 # By the geoJSON data, Musqueam territory is geographically inside
 # Dunbar-Southlands. The band has a policing arrangement with VPD,
@@ -54,9 +43,18 @@ new <- c('Break and Enter', 'Break and Enter', 'Homicide', 'Mischief',
          'Vehicle or Pedestrian Struck',
          'Vehicle or Pedestrian Struck')
 crime$general_crime_type <- factor(crime$crime_type, old, new)
+
+# There are a large number (over 68000 at time of writing) of incidents
+# that have a null or 0 X/Y location.
+# Hour and Minute are also almost always 0.
+# This subset will be extracted and examined separately.
+no_loc_crime <- crime %>%
+  filter(x == 0 | y == 0 | is.na(x) | is.na(y) | neighbourhood == "")
+
+# A clean crime dataset with complete observations only
+crime <- crime %>% filter(x != 0 & y != 0 & !is.na(x) & !is.na(y) & neighbourhood != "")
+
 rm(new, old)
-
-
 
 # LOAD Vancouver neighbourhood maps ###################################
 # read geoJSON data into a dataframe-like object
@@ -129,6 +127,7 @@ rm(geometry, points, UTM.10)
 
 # SAVE PROCESSED DATA ################################################
 # a preprocessed binary file is speedier to load than a CSV
+save(no_loc_crime, file = 'data/no_loc_crime.Rdata')
 save(crime, file = 'data/crime.Rdata')
 save(crimegeom, file = 'data/crimegeom.Rdata')
 save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
