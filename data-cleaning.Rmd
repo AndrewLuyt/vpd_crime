@@ -1,6 +1,7 @@
 ---
 title: "Data Cleaning"
 output: github_document
+author: Andrew Luyt
 ---
 
 ```{r setup, include=FALSE}

@@ -1,3 +1,5 @@
+# Andrew Luyt, 2021
+#
 # Analyze the combined VPD Crime and neighbourhood maps.
 # WIP
 

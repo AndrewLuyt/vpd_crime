@@ -1,3 +1,5 @@
+# Andrew Luyt, 2021
+#
 # a utility to preprocess data from the VPD crimes dataset, the Vancouver
 # neighbourhoods dataset, and (TODO) the Vancouver Census dataset,
 # and then save it in various formats for euse in other contexts, like
