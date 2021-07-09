@@ -9,6 +9,8 @@ required-packages-libraries.txt
 test.R
 # reading material
 resources/
+# output of a report
+analyze_vpd_crime.html
 
 # History files
 .Rhistory
