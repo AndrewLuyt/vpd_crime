@@ -7,6 +7,7 @@
 
 library(tidyverse)
 library(sf)        # Simple Features (geographical objects): for neighbourhood maps
+library(lubridate)
 
 CRIMEDATA <- "data/crimedata_csv_all_years.csv"
 SHAPEDATA <- "data/vancouver_neighbourhood_boundaries_geodata/local-area-boundary.geojson"
@@ -44,7 +45,18 @@ new <- c('Break and Enter', 'Break and Enter', 'Homicide', 'Mischief',
          'Offence Against a Person', 'Theft', 'Theft', 'Theft', 'Theft',
          'Vehicle or Pedestrian Struck',
          'Vehicle or Pedestrian Struck')
-crime$general_crime_type <- factor(crime$crime_type, old, new)
+crime <- crime %>%
+  mutate(general_crime_type = factor(crime_type, old, new))
+
+# create weekday feature, week starts Monday, as a factor
+crime <- crime %>%
+  mutate(weekday = wday(as.POSIXct(paste(
+    paste(year, month, day, sep = '-'),
+    " ",
+    paste(hour, minute, sep = ":")
+  )),
+  label = TRUE,
+  week_start = 1))
 
 # There are a large number (over 68000 at time of writing) of incidents
 # that have a null or 0 X/Y location.
@@ -135,7 +147,7 @@ save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
 # keep a geoJSON file too. Delete the old version first, else st_write
 # apparently reads the entire file first (slow)
 st_write(obj = crime, dsn = 'data/crimegeom.geojson', delete_dsn = TRUE)
-# Tableau likes shape files - save the neighbourhoods in that format
+# Tableau likes geojson - save the neighbourhoods in that format
 st_write(obj = neighbourhoods,
          dsn= "data/processed-neighbourhood/neighbourhoods.geoJSON",
          delete_dsn = TRUE)
