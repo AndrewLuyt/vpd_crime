@@ -1,8 +1,8 @@
 # Andrew Luyt, 2021
 #
-# a utility to preprocess data from the VPD crimes dataset, the Vancouver
+# A utility to preprocess data from the VPD crimes dataset, the Vancouver
 # neighbourhoods dataset, and (TODO) the Vancouver Census dataset,
-# and then save it in various formats for euse in other contexts, like
+# and then save it in various formats for use in other contexts, like
 # mapping in R or Tableau.
 
 library(tidyverse)
@@ -122,20 +122,29 @@ UTM.10 = st_crs(32610)
 geometry <- st_sfc(points, crs = UTM.10)
 # Make the sf (Simple Feature) object.  Contains the geometry which locates
 # crime points and 10 attributes describing each one.
-crimegeom <- st_sf(crime, geometry)
+crime <- st_sf(crime, geometry)
 # Tableau likes lon/lat coordinates, not UTM. Convert to NAD83.
-crimegeom <- st_transform(crimegeom, 4269)
+crime <- st_transform(crime, 4269)
 rm(geometry, points, UTM.10)
 
 # SAVE PROCESSED DATA ################################################
 # a preprocessed binary file is speedier to load than a CSV
 save(no_loc_crime, file = 'data/no_loc_crime.Rdata')
-save(crime, file = 'data/crime.Rdata')
-save(crimegeom, file = 'data/crimegeom.Rdata')
+save(crime, file = 'data/crimegeom.Rdata')
 save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
 # keep a geoJSON file too. Delete the old version first, else st_write
 # apparently reads the entire file first (slow)
-st_write(obj = crimegeom, dsn = 'data/crimegeom.geojson', delete_dsn = TRUE)
-# a CSV for use in Tableau
-# TODO: extract the lon/lat from the geometry before exporting
-#write.csv(crime, file = "data/processed_crime.csv")
+st_write(obj = crime, dsn = 'data/crimegeom.geojson', delete_dsn = TRUE)
+# Tableau likes shape files - save the neighbourhoods in that format
+st_write(obj = neighbourhoods,
+         dsn= "data/processed-neighbourhood/neighbourhoods.geoJSON",
+         delete_dsn = TRUE)
+
+# a version without geometry. Also export it as csv.
+crime <- crime %>%
+  mutate(lon = unlist(map(crime$geometry, 1)),
+         lat = unlist(map(crime$geometry,2))) %>%
+  as_tibble() %>%  # MUST come before select(), sf geometry column is 'sticky' and infuriating
+  select(!geometry)
+save(crime, file = 'data/crime_plain.Rdata')
+write.csv(crime, file = "data/tableau_crime.csv")
