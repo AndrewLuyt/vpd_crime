@@ -167,7 +167,7 @@ crime %>% ggplot(aes(year, fill = crime_type)) +
 #' ## Some maps (WIP)
 #' Draw the top crime by neighbourhood, and annotate with the percentage of
 #' all crime in the neighbourhood that it makes up
-#+ include=FALSE
+#+ echo=FALSE
 ggplot(data = neighbourhoods) +
   # geom_sf(aes(geometry = geometry, fill=crime_proportion), col='white') +
   geom_sf(aes(geometry = geometry, fill=top_crime), col='white') +
@@ -191,7 +191,7 @@ ggplot(data = neighbourhoods) +
 
 #' Draw the top NON-THEFT crime by neighbourhood, and annotate with the
 #' percentage of all crime in the neighbourhood that it makes up
-#+ include=FALSE
+#+ echo=FALSE
 neighbourhoods %>% ggplot() +
   # geom_sf(aes(geometry = geometry, fill=crime_proportion), col='white') +
   geom_sf(aes(geometry = geometry, fill=top_nontheft_crime), col='white') +
