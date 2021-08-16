@@ -29,10 +29,14 @@ crime <- read_csv(CRIMEDATA)
 # Dunbar-Southlands. The band has a policing arrangement with VPD,
 # and incidents are recorded as "Musqueam".
 # For mapping purposes, fold Musqueam into D-S incidents.
+# Also give downtown its intuitive name.
 crime <- crime %>%
   mutate(NEIGHBOURHOOD = replace(NEIGHBOURHOOD,
                                  which(NEIGHBOURHOOD == 'Musqueam'),
-                                 "Dunbar-Southlands")) %>%
+                                 "Dunbar-Southlands"),
+         NEIGHBOURHOOD = replace(NEIGHBOURHOOD,
+                                 which(NEIGHBOURHOOD == "Central Business District"),
+                                 "Downtown")) %>%
   select(TYPE, YEAR, MONTH, DAY, HOUR, MINUTE, HUNDRED_BLOCK, NEIGHBOURHOOD, X, Y) %>%
   rename_with(tolower) %>%
   rename(crime_type = type) %>%
@@ -58,6 +62,8 @@ crime <- crime %>%
   label = TRUE,
   week_start = 1))
 
+# TODO: create datetime column
+
 # There are a large number (over 68000 at time of writing) of incidents
 # that have a null or 0 X/Y location.
 # Hour and Minute are also almost always 0.
@@ -67,7 +73,8 @@ no_loc_crime <- crime %>%
 
 # A clean crime dataset with complete observations only
 crime <- crime %>% filter(x != 0 & y != 0 & !is.na(x) & !is.na(y) & neighbourhood != "")
-
+# create unique row ID.
+crime <- tibble::rowid_to_column(crime, "id")
 rm(new, old)
 
 # LOAD Vancouver neighbourhood maps ###################################
@@ -76,7 +83,6 @@ rm(new, old)
 # Ensure neighbourhood names match the geoJSON data
 neighbourhoods <- st_read(SHAPEDATA)
 neighbourhoods$name[neighbourhoods$name == 'Arbutus-Ridge'] <- 'Arbutus Ridge'
-neighbourhoods$name[neighbourhoods$name == 'Downtown'] <- 'Central Business District'
 
 # TOP CRIMES ###########################################
 # calculate top crimes and add to neighbourhoods
@@ -122,41 +128,46 @@ neighbourhoods <-
              top_nontheft_crimes,
              by=c("name" = "neighbourhood"))
 
-# CREATE SF OBJECT FROM CRIMES DATASET ################################
-# We need a geometry column to do this.
-# The geometry is the Point for every crime location, stored in the VPD
-# dataset as X,Y coordinates in the UTM 10 CRS (Coordinate Reference System)
-#
+# Convert UTM 10 coordinates into WGS84 longitude & latitude #################
 # First create sf Points for the crime locations, NB: capital-M Map
 points <- lapply(Map(c, crime$x, crime$y), st_point)
-# Make the geometry column, an sfc object: Simple Feature Collection of Points.
+
+# Make the sf object with a geometry column of sfc (points collection)
 UTM.10 = st_crs(32610)
-geometry <- st_sfc(points, crs = UTM.10)
-# Make the sf (Simple Feature) object.  Contains the geometry which locates
-# crime points and 10 attributes describing each one.
-crime <- st_sf(crime, geometry)
-# Tableau likes lon/lat coordinates, not UTM. Convert to NAD83.
-crime <- st_transform(crime, 4269)
-rm(geometry, points, UTM.10)
+coords <- st_sf(st_sfc(points, crs = UTM.10))
+
+# rename geometry column, and make sure the sf object knows it was renamed
+names(coords) <- c("geometry")
+st_geometry(coords) <- "geometry"
+
+# Tableau prefers lon/lat coordinates, not UTM. Convert to NAD83.
+coords <- st_transform(coords, 4269)
+
+# Create unique IDs that match to the rows in the "crime" tibble
+coords <- tibble::rowid_to_column(coords, "id")
+
+rm(points, UTM.10)
 
 # SAVE PROCESSED DATA ################################################
 # a preprocessed binary file is speedier to load than a CSV
 save(no_loc_crime, file = 'data/no_loc_crime.Rdata')
-save(crime, file = 'data/crimegeom.Rdata')
+# save(crime, file = 'data/crimegeom.Rdata')
 save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
 # keep a geoJSON file too. Delete the old version first, else st_write
 # apparently reads the entire file first (slow)
-st_write(obj = crime, dsn = 'data/crimegeom.geojson', delete_dsn = TRUE)
-# Tableau likes geojson - save the neighbourhoods in that format
-st_write(obj = neighbourhoods,
-         dsn= "data/processed-neighbourhood/neighbourhoods.geoJSON",
-         delete_dsn = TRUE)
+joined = inner_join(crime, coords, by = 'id')
+st_write(obj = joined, dsn = 'data/crimegeom.geojson', delete_dsn = TRUE)
 
-# a version without geometry. Also export it as csv.
+# TODO: this is failing with an error now?
+# Tableau likes geojson - save the neighbourhoods in that format
+# st_write(obj = neighbourhoods,
+#          dsn= "data/processed-neighbourhood/neighbourhoods.geoJSON",
+#          delete_dsn = TRUE)
+
+# cleaned crime data with longitude-latitude coordinates
 crime <- crime %>%
-  mutate(lon = unlist(map(crime$geometry, 1)),
-         lat = unlist(map(crime$geometry,2))) %>%
-  as_tibble() %>%  # MUST come before select(), sf geometry column is 'sticky' and infuriating
-  select(!geometry)
-save(crime, file = 'data/crime_plain.Rdata')
+  mutate(lon = unlist(map(coords$geometry, 1)),
+         lat = unlist(map(coords$geometry,2)))
+
+save(crime, file = 'data/crime.Rdata')
 write.csv(crime, file = "data/tableau_crime.csv")
