@@ -43,12 +43,26 @@ crime <- crime %>%
   # We have no map for Stanley Park
   filter(neighbourhood != 'Stanley Park')
 
-# group the 11 crimes into 6 more general categories to make vis's simpler
+# There are a large number (over 68000 at time of writing) of incidents
+# that have a null or 0 X/Y location.
+# These are the Homicide and Offence Against A Person crimes, which
+# have been doubly anonymized.
+no_loc_crime <- crime %>%
+  filter(crime_type == "Homicide" | crime_type == "Offence Against a Person")
+  # filter(x == 0 | y == 0 | is.na(x) | is.na(y) | neighbourhood == "")
+
+# crime dataset with complete observations only
+crime <- crime %>% filter(x != 0, y != 0, !is.na(x), !is.na(y),
+                          neighbourhood != "",
+                          crime_type != "Homicide",
+                          crime_type != "Offence Against a Person")
+
+# group the 9 remaining crimes into 4 general categories to simplify
 old <- sort(unique(crime$crime_type))
-new <- c('Break and Enter', 'Break and Enter', 'Homicide', 'Mischief',
-         'Offence Against a Person', 'Theft', 'Theft', 'Theft', 'Theft',
-         'Vehicle or Pedestrian Struck',
-         'Vehicle or Pedestrian Struck')
+new <- c('Break and Enter', 'Break and Enter', 'Mischief',
+         'Theft', 'Theft', 'Theft', 'Theft',
+         'Vehicular', 'Vehicular')
+
 crime <- crime %>%
   mutate(
     general_crime_type = factor(crime_type, old, new),
@@ -59,16 +73,6 @@ crime <- crime %>%
                    week_start = 1),
     dt = as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
                                 paste(hour, minute, sep = ":"))))
-
-# There are a large number (over 68000 at time of writing) of incidents
-# that have a null or 0 X/Y location.
-# Hour and Minute are also almost always 0.
-# This subset will be extracted and examined separately.
-no_loc_crime <- crime %>%
-  filter(x == 0 | y == 0 | is.na(x) | is.na(y) | neighbourhood == "")
-
-# A clean crime dataset with complete observations only
-crime <- crime %>% filter(x != 0 & y != 0 & !is.na(x) & !is.na(y) & neighbourhood != "")
 
 # create unique row ID.
 crime <- tibble::rowid_to_column(crime, "id")
