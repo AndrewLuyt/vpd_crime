@@ -14,14 +14,18 @@ library(tidyverse)
 library(sf)
 library(gganimate)
 
-#' **Incidents without location information**
+#' **Doubly-nonymized data (Homicide and Offence Against a Person)**
 if (file.exists("data/no_loc_crime.Rdata")) {
   load("data/no_loc_crime.Rdata")
 } else {
   stop("Please run preprocess_data.R to create the required data")
 }
+no_loc_crime <- no_loc_crime %>%
+  mutate(crime_type = as_factor(crime_type),
+         month = as_factor(month),
+         neighbourhood = as_factor(neighbourhood))
 
-#' **Load the crime data with geometry**
+#' **Load the regular crime data**
 if (file.exists("data/crime.Rdata")) {
   load("data/crime.Rdata")
 } else {
@@ -40,17 +44,18 @@ if (file.exists("data/neighbourhoods.Rdata")) {
 }
 
 
-#' Animation of thefts
+#' Animation
 p <- crime %>%
   filter(year == 2021) %>%
-  ggplot(aes(lon, lat, group = hour, color = general_crime_type)) +
+  ggplot(aes(lon, lat, color = general_crime_type, group = interaction(hour, general_crime_type, lex.order = FALSE))) +
   geom_sf(data = neighbourhoods, mapping = aes(), inherit.aes = FALSE) +
   geom_point() +
-  transition_states(hour, transition_length = 2, state_length = 2, wrap = TRUE) +
-  enter_fade() +
-  exit_fade() +
+  transition_states(interaction(hour, general_crime_type, lex.order = FALSE),
+                    transition_length = 2, state_length = 2, wrap = TRUE) +
+  # enter_fade() +
+  # exit_fade() +
   ggtitle("{previous_state}")
-FPS = 30;W = 860;H = 600;DTL = 3;S = paste0(W,"x",H);NFRAMES = 1*24*1*4 # minutebins*hours*days*framesperbin
+FPS = 20;W = 640;H = 447;DTL = 3;S = paste0(W,"x",H);NFRAMES = 4*24*1*4 # minutebins*hours*days*framesperbin
 animate(plot = p, fps = FPS, nframes = NFRAMES, width = W, height = H, detail = DTL)
 
 
