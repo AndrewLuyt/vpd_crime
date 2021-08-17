@@ -50,19 +50,15 @@ new <- c('Break and Enter', 'Break and Enter', 'Homicide', 'Mischief',
          'Vehicle or Pedestrian Struck',
          'Vehicle or Pedestrian Struck')
 crime <- crime %>%
-  mutate(general_crime_type = factor(crime_type, old, new))
-
-# create weekday feature, week starts Monday, as a factor
-crime <- crime %>%
-  mutate(weekday = wday(as.POSIXct(paste(
-    paste(year, month, day, sep = '-'),
-    " ",
-    paste(hour, minute, sep = ":")
-  )),
-  label = TRUE,
-  week_start = 1))
-
-# TODO: create datetime column
+  mutate(
+    general_crime_type = factor(crime_type, old, new),
+    # create weekday feature, week starts Monday, as a factor
+    weekday = wday(as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
+                                    paste(hour, minute, sep = ":"))),
+                   label = TRUE,
+                   week_start = 1),
+    dt = as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
+                                paste(hour, minute, sep = ":"))))
 
 # There are a large number (over 68000 at time of writing) of incidents
 # that have a null or 0 X/Y location.
@@ -73,8 +69,10 @@ no_loc_crime <- crime %>%
 
 # A clean crime dataset with complete observations only
 crime <- crime %>% filter(x != 0 & y != 0 & !is.na(x) & !is.na(y) & neighbourhood != "")
+
 # create unique row ID.
 crime <- tibble::rowid_to_column(crime, "id")
+
 rm(new, old)
 
 # LOAD Vancouver neighbourhood maps ###################################
@@ -126,7 +124,9 @@ top_nontheft_crimes$p_top_nontheft_crime <-
 neighbourhoods <-
   inner_join(neighbourhoods,
              top_nontheft_crimes,
-             by=c("name" = "neighbourhood"))
+             by=c("name" = "neighbourhood")) %>%
+  select(-total_incidents.y) %>%
+  rename(total_incidents = total_incidents.x)
 
 # Convert UTM 10 coordinates into WGS84 longitude & latitude #################
 # First create sf Points for the crime locations, NB: capital-M Map
