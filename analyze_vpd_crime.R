@@ -1,6 +1,7 @@
 #' ---
 #' author: "Andrew Luyt"
 #' title: "WIP: Explore & analyze the VPD Crime dataset"
+#' output: github_document
 #' ---
 #'
 #' Download the data yourself as described in the README
@@ -11,6 +12,7 @@
 
 library(tidyverse)
 library(sf)
+library(gganimate)
 
 #' **Incidents without location information**
 if (file.exists("data/no_loc_crime.Rdata")) {
@@ -19,19 +21,16 @@ if (file.exists("data/no_loc_crime.Rdata")) {
   stop("Please run preprocess_data.R to create the required data")
 }
 
-# Load the crime data
-# if (file.exists("data/crime_plain.Rdata")) {
-#   load("data/crime_plain.Rdata")
-# } else {
-#   stop("Please run preprocess_data.R to create the required data")
-# }
-
 #' **Load the crime data with geometry**
-if (file.exists("data/crimegeom.Rdata")) {
-  load("data/crimegeom.Rdata")
+if (file.exists("data/crime.Rdata")) {
+  load("data/crime.Rdata")
 } else {
   stop("Please run preprocess_data.R to create the required data")
 }
+crime <- crime %>%
+  mutate(crime_type = as_factor(crime_type),
+         month = as_factor(month),
+         neighbourhood = as_factor(neighbourhood))
 
 #' **Load the neighbourhood shapes**
 if (file.exists("data/neighbourhoods.Rdata")) {
@@ -40,6 +39,40 @@ if (file.exists("data/neighbourhoods.Rdata")) {
   stop("Please run preprocess_data.R to create the required data")
 }
 
+
+#' Animation of thefts
+p <- crime %>%
+  filter(year == 2021) %>%
+  ggplot(aes(lon, lat, group = hour, color = general_crime_type)) +
+  geom_sf(data = neighbourhoods, mapping = aes(), inherit.aes = FALSE) +
+  geom_point() +
+  transition_states(hour, transition_length = 2, state_length = 2, wrap = TRUE) +
+  enter_fade() +
+  exit_fade() +
+  ggtitle("{previous_state}")
+FPS = 30;W = 860;H = 600;DTL = 3;S = paste0(W,"x",H);NFRAMES = 1*24*1*4 # minutebins*hours*days*framesperbin
+animate(plot = p, fps = FPS, nframes = NFRAMES, width = W, height = H, detail = DTL)
+
+
+#' ## Crimes without location information (removed from later analysis)
+#' Over 68000 observations in the dataset
+no_loc_crime %>%
+  summarise(across(where(is.character) | where (is.factor),
+                   n_distinct))
+#' Limited to homicides andd offences against a person. In fact, all of
+#' these incidents have been anonymized
+unique(no_loc_crime$crime_type)
+no_loc_crime %>%
+  filter(year > 2017) %>%
+  group_by(year, crime_type) %>%
+  summarize(n = n())
+
+#' Removed by VPD for privacy reasons
+unique(no_loc_crime$hundred_block)
+
+#' All times have been set to midnight
+unique(no_loc_crime$hour)
+unique(no_loc_crime$minute)
 
 #' ## Total crime by year
 crime %>%
@@ -56,16 +89,16 @@ crime %>%
 #' ## Proportional crime by weekday, showing crime type, 2020.
 #' Pretty much identical!
 crime %>%
-  filter(year == 2021) %>%
+  filter(year == 2020) %>%
   ggplot(aes(x=weekday, fill=crime_type)) +
-  geom_bar(position = 'fill')
+  geom_bar()
 
 #' ## Proportional crime by weekday and hour of crime, 2020.
 #' Pretty much identical!
 crime %>%
-  filter(year == 2021) %>%
+  filter(year == 2020) %>%
   ggplot(aes(x=weekday, fill=factor(hour))) +
-  geom_bar(position = 'fill')
+  geom_bar()
 
 #' ## Proportional crime by month, 2016-2020.
 #' Note the proportional shinkage of crime in the spring and summer months
@@ -74,6 +107,14 @@ crime %>%
   filter(year >= 2016 & year < 2021) %>%
   ggplot(aes(x=year, fill=factor(month))) +
   geom_bar(position='fill')
+
+crime %>%
+  filter(year >= 2016, year <= 2021) %>%
+  filter(!(year == 2021 & month == 8)) %>%
+  group_by(year, month) %>%
+  summarise(crimes = n()) %>%
+  ggplot(aes(month, crimes, color = as_factor(year), group = year)) +
+  geom_line()
 
 #' ## What time is most popular for crime, 2020?
 #' A huge spike at midnight - is this a data entry issue?
@@ -103,7 +144,7 @@ crime %>%
 #' ## Have the *proportions* of *types* of crime changed over the years?
 #' It appears theft was on the rise until 2020 when it dropped sharply.
 crime %>%
-  filter(year < 2021) %>%
+  # filter(year < 2021) %>%
   ggplot(aes(desc(year), fill = general_crime_type)) +
   geom_bar(position = 'fill', color='black', size=.5, width = .8) +
   coord_flip()
@@ -112,16 +153,16 @@ crime %>%
 #' Here we can confirm that the drop in crime in 2020 seems to have been
 #' driven by a decline in *theft*.
 crime %>%
-  filter(year < 2021) %>%
+  # filter(year < 2021) %>%
   ggplot(aes(desc(year), fill = general_crime_type)) +
   geom_bar(position = 'stack', color='black', size=.5, width = .8) +
   coord_flip()
 
 #' ## Even more detail..
 #' Looking closely we can see that the drop in *theft* in 2020 seems mostly to have been
-#' driven by a decline in *thefts from vehicles*.
+#' driven by a decline in *thefts from vehicles* (with some help from *other theft*.)
 crime %>%
-  filter(year < 2021) %>%
+  # filter(year < 2021) %>%
   ggplot(aes(desc(year), fill = crime_type)) +
   geom_bar(position = 'stack', color='black', size=.5, width = .8) +
   coord_flip()
@@ -162,7 +203,7 @@ crime %>% ggplot(aes(year, fill = crime_type)) +
   geom_bar(color='black') +
   annotate("text", label = "Covid-19?", x = 2020, y = 50000) +
   annotate("curve", x = 2020, y = 48000, xend = 2020, yend = 34000,
-           curvature = -.3, arrow = arrow())
+           curvature = -.1, arrow = arrow(length = unit(.2, "cm")))
 
 #' ## Some maps (WIP)
 #' Draw the top crime by neighbourhood, and annotate with the percentage of
