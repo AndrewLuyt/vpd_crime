@@ -206,7 +206,7 @@ census %>%
   ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
   geom_line() +
   geom_point(data = predicted_populations,
-             mapping = aes(year, predicted_pop, color = neighbourhood))
+             mapping = aes(year, population, color = neighbourhood))
 tmp <- predicted_populations %>%
   filter(neighbourhood != "Metro Vancouver", neighbourhood != "City of Vancouver")
 census %>%
@@ -214,7 +214,7 @@ census %>%
   ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
   geom_line() +
   geom_point(data = tmp,
-             mapping = aes(year, predicted_pop, color = neighbourhood))
+             mapping = aes(year, population, color = neighbourhood))
 
 # SAVE PROCESSED DATA ################################################
 # a preprocessed binary file is speedier to load than a CSV
