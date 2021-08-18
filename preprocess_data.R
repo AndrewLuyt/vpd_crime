@@ -66,13 +66,10 @@ new <- c('Break and Enter', 'Break and Enter', 'Mischief',
 crime <- crime %>%
   mutate(
     general_crime_type = factor(crime_type, old, new),
-    # create weekday feature, week starts Monday, as a factor
-    weekday = wday(as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
-                                    paste(hour, minute, sep = ":"))),
-                   label = TRUE,
-                   week_start = 1),
     dt = as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
-                                paste(hour, minute, sep = ":"))))
+                          paste(hour, minute, sep = ":"))),
+    weekday = wday(dt, label = TRUE, week_start = 1))
+
 
 # create unique row ID.
 crime <- tibble::rowid_to_column(crime, "id")
@@ -152,10 +149,80 @@ coords <- tibble::rowid_to_column(coords, "id")
 
 rm(points, UTM.10)
 
+
+# Census data ######################################
+# interpolate values for all years given 2006, 2011, 2016
+# "The data may be reproduced provided they are credited to Statistics Canada,
+# Census 2016, 2011, 2006, custom order for City of Vancouver Local Areas"
+#
+census2016 <- read_csv("data/CensusLocalAreaProfiles2016.csv", skip = 4,
+                       col_types = "ncnnnnnnnnnnnnnnnnnnnnnnnn") %>%
+  pivot_longer(3:26, names_to = "neighbourhood", values_to = "population") %>%
+  filter(Variable == "Total - Age groups and average age of the population - 100% data") %>%
+  mutate(year = 2016,
+         neighbourhood = replace(neighbourhood, neighbourhood == "Vancouver CSD", "City of Vancouver"),
+         neighbourhood = replace(neighbourhood, neighbourhood == "Vancouver CMA", "Metro Vancouver")) %>%
+  select(neighbourhood, population, year)
+census2011 <- read_csv("data/CensusLocalAreaProfiles2011.csv", skip = 4,
+                       col_types = "cnnnnnnnnnnnnnnnnnnnnnnnn") %>%
+  pivot_longer(2:25, names_to = "neighbourhood", values_to = "population") %>%
+  rename(Variable = 1) %>%
+  filter(Variable == "Total population by age groups") %>%
+  mutate(year = 2011,
+         neighbourhood = replace(neighbourhood, neighbourhood == "Vancouver CSD (City)", "City of Vancouver"),
+         neighbourhood = replace(neighbourhood, neighbourhood == "CMA of Vancouver", "Metro Vancouver")) %>%
+  select(neighbourhood, population, year)
+census2006 <- read_csv("data/CensusLocalAreaProfiles2006.csv", skip = 4,
+                       col_types = "cnnnnnnnnnnnnnnnnnnnnnnnn") %>%
+  pivot_longer(2:25, names_to = "neighbourhood", values_to = "population") %>%
+  rename(Variable = 1) %>%
+  filter(Variable == "Male & Female, Total") %>%
+  mutate(year = 2006,
+         neighbourhood = replace(neighbourhood, neighbourhood == "Vancouver CSD (City of Vancouver)", "City of Vancouver"),
+         neighbourhood = replace(neighbourhood, neighbourhood == "Vancouver CMA  (Metro Vancouver)", "Metro Vancouver")) %>%
+  select(neighbourhood, population, year)
+census <- rbind(census2016, census2011, census2006) %>%
+  mutate(population = as.numeric(population),
+         prediction = FALSE)
+rm(census2016, census2011, census2006)
+
+# impute populations for all the years between the census, with a linear model.
+# We'll also extrapolate for 2017-2021.  This lets us estimate
+# per capita crime figures with the VPD data, for all years.
+l <- lm(population ~ year * neighbourhood, data = census)
+predict_years <- c(2007:2010, 2012:2015, 2017:2021)
+predict_neighbourhoods <- unique(census$neighbourhood)
+y <- expand.grid(predict_neighbourhoods, predict_years) %>%
+  rename(neighbourhood = Var1, year = Var2)
+predicted_populations <- y %>%
+  mutate(population = predict(l, y),
+         prediction = TRUE)
+
+census_with_predictions <- rbind(census, predicted_populations) %>%
+  arrange(year, neighbourhood)
+
+# quick visual sanity checks
+census %>%
+  ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
+  geom_line() +
+  geom_point(data = predicted_populations,
+             mapping = aes(year, predicted_pop, color = neighbourhood))
+tmp <- predicted_populations %>%
+  filter(neighbourhood != "Metro Vancouver", neighbourhood != "City of Vancouver")
+census %>%
+  filter(neighbourhood != "Metro Vancouver", neighbourhood != "City of Vancouver") %>%
+  ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
+  geom_line() +
+  geom_point(data = tmp,
+             mapping = aes(year, predicted_pop, color = neighbourhood))
+
 # SAVE PROCESSED DATA ################################################
 # a preprocessed binary file is speedier to load than a CSV
+save(census, file = "data/census.Rdata")
+write_csv(census, file = "data/census.csv")
+save(census_with_predictions, file = "data/population.Rdata")
+write_csv(census, file = "data/population.csv")
 save(no_loc_crime, file = 'data/no_loc_crime.Rdata')
-# save(crime, file = 'data/crimegeom.Rdata')
 save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
 # keep a geoJSON file too. Delete the old version first, else st_write
 # apparently reads the entire file first (slow)
