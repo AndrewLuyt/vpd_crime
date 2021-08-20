@@ -243,8 +243,11 @@ predicted_populations <- x %>%
          prediction = TRUE)
 ```
 
+### Visually check predictions
+
+The points are the real census data, the lines are predictions.
+
 ``` r
-# visual sanity checks: points are the real census data, lines are predictions
 census %>%
   ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
   geom_point() +
@@ -270,7 +273,7 @@ census %>%
 
 ![](preprocess_data_files/figure-gfm/sanity%20check%20plots-2.png)<!-- -->
 
-Looks fine.
+Looks fine. Bind the population predictions to the census populations.
 
 ``` r
 census_with_predictions <-
@@ -297,7 +300,7 @@ st_write(obj = neighbourhoods,
 ```
 
 At this point `crime` contains a `geometry` column: a 2-part coordinate
-as one Point, which is useful for `sf` objects. In other contexts we may
+as one Point, which is useful for sf objects. In other contexts we may
 like direct access to longitude/latitude, so break Points into two
 numeric features.
 
