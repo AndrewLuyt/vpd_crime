@@ -200,8 +200,8 @@ predicted_populations <- x %>%
   mutate(population = predict(model, x),
          prediction = TRUE)
 
-# visual sanity checks: points are the real census data, lines are predictions
 #+ "sanity check plots"
+# visual sanity checks: points are the real census data, lines are predictions
 census %>%
   ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
   geom_point() +
@@ -240,7 +240,7 @@ st_write(obj = neighbourhoods,
          delete_dsn = TRUE)
 
 #' At this point `crime` contains a `geometry` column: a 2-part coordinate as
-#' one Point, which is useful for sf objects. In other contexts we may like
+#' one Point, which is useful for `sf` objects. In other contexts we may like
 #' direct access to longitude/latitude, so break Points into two numeric
 #' features.
 #+ echo=TRUE, results='hide'
