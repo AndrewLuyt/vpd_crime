@@ -1,7 +1,7 @@
 WIP: Clean and process the VPD Crime dataset, with supplementary data
 ================
 Andrew Luyt
-2021-08-20
+2021-08-21
 
 A utility to preprocess data from the VPD crimes dataset, the Vancouver
 neighbourhoods dataset, and the Vancouver Census datasets, then save it
@@ -106,9 +106,10 @@ Group the 9 remaining crimes into 4 general categories to simplify
 
 ``` r
 old <- sort(unique(crime$type))
-new <- c('Break and Enter', 'Break and Enter', 'Mischief',
-         'Theft', 'Theft', 'Theft', 'Theft',
-         'Vehicular', 'Vehicular')
+new <- c('Theft', 'Theft', 'Theft', 'Theft',
+         'Vehicular', 'Vehicular',
+         'Break and Enter', 'Break and Enter',
+         'Mischief')
 crime <- crime %>%
   mutate(general_type = factor(type, old, new))
 

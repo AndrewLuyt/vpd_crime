@@ -90,9 +90,10 @@ crime <- crime %>% filter(x != 0, y != 0, !is.na(x), !is.na(y),
 
 #' Group the 9 remaining crimes into 4 general categories to simplify
 old <- sort(unique(crime$type))
-new <- c('Break and Enter', 'Break and Enter', 'Mischief',
-         'Theft', 'Theft', 'Theft', 'Theft',
-         'Vehicular', 'Vehicular')
+new <- c('Theft', 'Theft', 'Theft', 'Theft',
+         'Vehicular', 'Vehicular',
+         'Break and Enter', 'Break and Enter',
+         'Mischief')
 crime <- crime %>%
   mutate(general_type = factor(type, old, new))
 
