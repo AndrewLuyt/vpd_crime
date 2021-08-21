@@ -10,10 +10,22 @@ database. This project uses the R language.
 
 ## Data Sources
 
-The data set is freely available for download at [The VPD Open Data
+The VPD data set is freely available for download at [The VPD Open Data
 Website](https://geodash.vpd.ca/opendata/). Save the zip file and
 extract it into a directory called `data`. Ensure the data is named
 `crimedata_csv_all_years.csv`
+
+Vancouver neighbourhood boundaries (map data) is available on the
+[Vancouver Open Data
+Portal](https://opendata.vancouver.ca/explore/dataset/local-area-boundary/export/).
+This project uses the GeoJSON format.
+
+Census data is also available on the Vancouver Open Data Portal. This
+project uses the CSV format.
+
+-   [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2016/information/](201%20.CSV)
+-   [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2011/information/](2011%20.CSV)
+-   [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2006/information/](2006%20.CSV)
 
 ## Processing the Raw Data
 
