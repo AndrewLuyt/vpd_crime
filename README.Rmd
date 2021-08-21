@@ -26,9 +26,9 @@ Vancouver neighbourhood boundaries (map data) is available on the
 Census data is also available on the Vancouver Open Data Portal. This project
 uses the CSV format.
 
-- [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2016/information/](201 .CSV)
-- [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2011/information/](2011 .CSV)
-- [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2006/information/](2006 .CSV)
+- [2016 .CSV](https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2016/information/)
+- [2011 .CSV](https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2011/information/)
+- [2006 .CSV](https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2006/information/)
 
 ## Processing the Raw Data
 [In this section](./preprocess_data.md) we process the VPD crime dataset, Vancouver map data,

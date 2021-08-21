@@ -23,9 +23,12 @@ This project uses the GeoJSON format.
 Census data is also available on the Vancouver Open Data Portal. This
 project uses the CSV format.
 
--   [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2016/information/](201%20.CSV)
--   [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2011/information/](2011%20.CSV)
--   [https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2006/information/](2006%20.CSV)
+-   [2016
+    .CSV](https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2016/information/)
+-   [2011
+    .CSV](https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2011/information/)
+-   [2006
+    .CSV](https://opendata.vancouver.ca/explore/dataset/census-local-area-profiles-2006/information/)
 
 ## Processing the Raw Data
 
