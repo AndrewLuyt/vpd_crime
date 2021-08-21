@@ -44,7 +44,7 @@ Modecount <- function(vec) {
 
 #' ## Load and process the crime dataset
 #+ message=FALSE
-crime <- read_csv(CRIMEDATA)
+crime <- read_csv(CRIMEDATA, col_types = "fiiiiiccnn")
 
 #' In the geoJSON map data, Musqueam territory is geographically inside the
 #' Dunbar-Southlands neighbourhood. The band has a policing arrangement with the
@@ -52,19 +52,25 @@ crime <- read_csv(CRIMEDATA)
 #' We don't have map data for Musqueam territory, so for mapping purposes we
 #' fold Musqueam into D-S incidents. Also, give Downtown its intuitive name.
 crime <- crime %>%
-  mutate(NEIGHBOURHOOD =
-           replace(NEIGHBOURHOOD,
-                   which(NEIGHBOURHOOD == 'Musqueam'),
-                   "Dunbar-Southlands"),
-         NEIGHBOURHOOD =
-           replace(NEIGHBOURHOOD,
-                   which(NEIGHBOURHOOD == "Central Business District"),
-                   "Downtown")) %>%
-  select(TYPE, YEAR, MONTH, DAY, HOUR, MINUTE, HUNDRED_BLOCK, NEIGHBOURHOOD, X, Y) %>%
   rename_with(tolower) %>%
-  rename(crime_type = type) %>%
   # We have no map data for Stanley Park
-  filter(neighbourhood != 'Stanley Park')
+  # filter(neighbourhood != 'Stanley Park') %>%
+  select(type, year, month, day, hour, minute, hundred_block, neighbourhood, x, y) %>%
+  mutate(neighbourhood =
+           replace(neighbourhood,
+                   which(neighbourhood == 'Musqueam'),
+                   "Dunbar-Southlands"),
+         neighbourhood =
+           replace(neighbourhood,
+                   which(neighbourhood == "Central Business District"),
+                   "Downtown"),
+         dt = as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
+                               paste(hour, minute, sep = ":"))),
+         wday = wday(dt, label = TRUE, week_start = 1),
+         month = month(dt, label = TRUE),
+         neighbourhood = as_factor(neighbourhood),
+         neighbourhood = fct_relevel(neighbourhood,
+                                     ~ levels(neighbourhood)[order(levels(neighbourhood))]))
 
 #' ### Split the dataset
 #' There are a large number of incidents (over 68000 at time of writing)
@@ -73,26 +79,22 @@ crime <- crime %>%
 #' VPD dataset has them recorded in this manner for anonymity. We split them
 #' off to be analyzed separately.
 no_loc_crime <- crime %>%
-  filter(crime_type == "Homicide" | crime_type == "Offence Against a Person") %>%
-  select(-c(hour, minute, x, y))  # all zero, all useless features
+  filter(type == "Homicide" | type == "Offence Against a Person") %>%
+  select(-c(hour, minute, x, y, hundred_block))    # all zero, all useless features
 
-# Create crime dataset for the other crimes
+# Create crime dataset for the other crimes. Remove some bad data too (< 100 rows)
 crime <- crime %>% filter(x != 0, y != 0, !is.na(x), !is.na(y),
                           neighbourhood != "",
-                          crime_type != "Homicide",
-                          crime_type != "Offence Against a Person")
+                          type != "Homicide",
+                          type != "Offence Against a Person")
 
 #' Group the 9 remaining crimes into 4 general categories to simplify
-old <- sort(unique(crime$crime_type))
+old <- sort(unique(crime$type))
 new <- c('Break and Enter', 'Break and Enter', 'Mischief',
          'Theft', 'Theft', 'Theft', 'Theft',
          'Vehicular', 'Vehicular')
 crime <- crime %>%
-  mutate(
-    general_crime_type = factor(crime_type, old, new),
-    dt = as.POSIXct(paste(paste(year, month, day, sep = '-'), " ",
-                          paste(hour, minute, sep = ":"))),
-    weekday = wday(dt, label = TRUE, week_start = 1))
+  mutate(general_type = factor(type, old, new))
 
 # create unique IDs.
 crime <- tibble::rowid_to_column(crime, "id")
@@ -175,7 +177,11 @@ census2006 <- read_csv("data/CensusLocalAreaProfiles2006.csv", skip = 4,
                    neighbourhood == "Vancouver CMA  (Metro Vancouver)", "Metro Vancouver")) %>%
   select(neighbourhood, population, year)
 
+`%nin%` = Negate(`%in%`) # create not-in operator for next chunk
+
 census <- rbind(census2016, census2011, census2006) %>%
+  # These are city level, not neighbourhood level
+  filter(neighbourhood %nin% c("City of Vancouver", "Metro Vancouver")) %>%
   mutate(population = as.numeric(population),
          prediction = FALSE)  # Later we'll mark imputations as predictions
 
@@ -187,17 +193,26 @@ rm(census2016, census2011, census2006)
 #' values using a simple linear model. Note that we'll be *extrapolating*
 #' for 2003-2005 and 2017-2021 so these figures should be seen with a more
 #' doubtful eye. This will have to do until the 2021 census
-#' results are released. We use a linear model with interactions: since
-#' population growth changes over years and neighbourhood growth is different,
-#' population will depend on the combination of year and neighbourhood.
-model <- lm(population ~ year * neighbourhood, data = census)
+#' results are released. We use a linear model with interactions: two
+#' neighbourhoods (Downtown in particular) have notably different population
+#' growth over time. For fun we'll test a parallel slopes model too.
+model_interactions <- lm(population ~ year * neighbourhood, data = census)
+model_parallel_slopes <- lm(population ~ year + neighbourhood, data = census)
+
+#' Even though we only have three points per neighbourhood, let's calculate
+#' the $R^2$ for both models
+moderndive::get_regression_summaries(model_interactions)
+moderndive::get_regression_summaries(model_parallel_slopes)
+
+#' As expected, the interactions model is superior. Use it to make predictions.
+
 predict_years <- c(2003:2005, 2007:2010, 2012:2015, 2017:2021)
 predict_neighbourhoods <- unique(census$neighbourhood)
 # Each year and neighbourhood gets a prediction: get all combinations
 x <- expand.grid(predict_neighbourhoods, predict_years) %>%
   rename(neighbourhood = Var1, year = Var2)
 predicted_populations <- x %>%
-  mutate(population = predict(model, x),
+  mutate(population = predict(model_interactions, x),
          prediction = TRUE)
 
 #' ### Visually check predictions
@@ -209,18 +224,9 @@ census %>%
   geom_line(data = predicted_populations,
              mapping = aes(year, population, color = neighbourhood)) +
   theme(legend.position = "none")
-# get a closer look at the smaller neighbourhoods
-tmp <- predicted_populations %>%
-  filter(neighbourhood != "Metro Vancouver", neighbourhood != "City of Vancouver")
-census %>%
-  filter(neighbourhood != "Metro Vancouver", neighbourhood != "City of Vancouver") %>%
-  ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
-  geom_point() +
-  geom_line(data = tmp,
-             mapping = aes(year, population, color = neighbourhood))+
-  theme(legend.position = "none")
 
-#' Looks fine. Bind the population predictions to the census populations.
+#' Looks fine. Two neighbourhoods stand out visually with different growth.
+#' Bind the population predictions to the census populations.
 census_with_predictions <-
   rbind(census, predicted_populations) %>%
   arrange(year, neighbourhood)
