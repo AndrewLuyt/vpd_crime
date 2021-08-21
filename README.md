@@ -17,6 +17,6 @@ extract it into a directory called `data`. Ensure the data is named
 
 ## Processing the Raw Data
 
-[In this section](./preprocess_data) we process the VPD crime dataset,
-Vancouver map data, and census information and export a number of files
-we can use in other contexts, like Tableau or natively in R.
+[In this section](./preprocess_data.md) we process the VPD crime
+dataset, Vancouver map data, and census information and export a number
+of files we can use in other contexts, like Tableau or natively in R.
