@@ -57,18 +57,22 @@ In the geoJSON map data, Musqueam territory is geographically inside the
 Dunbar-Southlands neighbourhood. The band has a policing arrangement
 with the VPD and incidents are recorded as “Musqueam”. We don’t have map
 data for Musqueam territory, so for mapping purposes we fold Musqueam
-into D-S incidents. Also, give Downtown its intuitive name.
+into D-S incidents. Also, change some neighbourhood names.
 
 ``` r
 crime <- crime %>%
   rename_with(tolower) %>%
-  # We have no map data for Stanley Park
-  # filter(neighbourhood != 'Stanley Park') %>%
+  # We have no map or population data for Stanley Park: just remove it
+  filter(neighbourhood != 'Stanley Park') %>%
   select(type, year, month, day, hour, minute, hundred_block, neighbourhood, x, y) %>%
   mutate(neighbourhood =
            replace(neighbourhood,
                    which(neighbourhood == 'Musqueam'),
                    "Dunbar-Southlands"),
+         neighbourhood =
+           replace(neighbourhood,
+                   which(neighbourhood == 'Kensington-Cedar Cottage'),
+                   "Kensington"),
          neighbourhood =
            replace(neighbourhood,
                    which(neighbourhood == "Central Business District"),
@@ -77,9 +81,7 @@ crime <- crime %>%
                                paste(hour, minute, sep = ":"))),
          wday = wday(dt, label = TRUE, week_start = 1),
          month = month(dt, label = TRUE),
-         neighbourhood = as_factor(neighbourhood),
-         neighbourhood = fct_relevel(neighbourhood,
-                                     ~ levels(neighbourhood)[order(levels(neighbourhood))]))
+         neighbourhood = as_factor(neighbourhood))
 ```
 
 ### Split the dataset
@@ -156,7 +158,9 @@ match the crime data
 
 ``` r
 neighbourhoods <- st_read(SHAPEDATA) %>%
-  mutate(name = replace(name, name == "Arbutus-Ridge", "Arbutus Ridge"),
+  mutate(name = replace(name, which(name == "Arbutus-Ridge"), "Arbutus Ridge"),
+         name = replace(name, which(name == "Kensington-Cedar Cottage"),
+                        "Kensington"),
          name = as_factor(name)) %>%
   select(-geo_point_2d)
 ```
@@ -219,7 +223,13 @@ census2006 <- read_csv("data/CensusLocalAreaProfiles2006.csv", skip = 4,
 census <- rbind(census2016, census2011, census2006) %>%
   # These are city level, not neighbourhood level
   filter(neighbourhood %nin% c("City of Vancouver", "Metro Vancouver")) %>%
-  mutate(population = as.numeric(population),
+  mutate(neighbourhood = replace(neighbourhood,
+                                 which(neighbourhood == "Arbutus-Ridge"),
+                                 "Arbutus Ridge"),
+         neighbourhood = replace(neighbourhood,
+                                 which(neighbourhood == "Kensington-Cedar Cottage"),
+                                 "Kensington"),
+         population = as.numeric(population),
          prediction = FALSE)  # Later we'll mark imputations as predictions
 
 rm(census2016, census2011, census2006)
