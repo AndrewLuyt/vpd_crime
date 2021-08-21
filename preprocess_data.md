@@ -296,7 +296,7 @@ Looks fine. Two neighbourhoods stand out visually with different growth.
 Bind the population predictions to the census populations.
 
 ``` r
-census_with_predictions <-
+populations <-
   rbind(census, predicted_populations) %>%
   arrange(year, neighbourhood)
 ```
@@ -309,8 +309,8 @@ binary file with R objects is speedier to load in R than a CSV.
 ``` r
 save(census, file = "data/census.Rdata")
 write_csv(census, file = "data/census.csv")
-save(census_with_predictions, file = "data/population.Rdata")
-write_csv(census_with_predictions, file = "data/population.csv")
+save(populations, file = "data/population.Rdata")
+write_csv(populations, file = "data/population.csv")
 save(no_loc_crime, file = 'data/no_loc_crime.Rdata')
 write_csv(no_loc_crime, file = 'data/no_loc_crime.csv')
 save(neighbourhoods, file = 'data/neighbourhoods.Rdata')
