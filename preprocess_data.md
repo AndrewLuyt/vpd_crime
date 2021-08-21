@@ -155,7 +155,10 @@ The 22 features are the 22 neighbourhoods. Ensure neighbourhood names
 match the crime data
 
 ``` r
-neighbourhoods <- st_read(SHAPEDATA)
+neighbourhoods <- st_read(SHAPEDATA) %>%
+  mutate(name = replace(name, name == "Arbutus-Ridge", "Arbutus Ridge"),
+         name = as_factor(name)) %>%
+  select(-geo_point_2d)
 ```
 
     ## Reading layer `local-area-boundary' from data source 
@@ -166,12 +169,6 @@ neighbourhoods <- st_read(SHAPEDATA)
     ## Dimension:     XY
     ## Bounding box:  xmin: -123.2248 ymin: 49.19894 xmax: -123.0232 ymax: 49.29581
     ## Geodetic CRS:  WGS 84
-
-``` r
-neighbourhoods$name[neighbourhoods$name == 'Arbutus-Ridge'] <- 'Arbutus Ridge'
-neighbourhoods <- neighbourhoods %>%
-  select(-geo_point_2d)
-```
 
 ## Load Census data
 
@@ -244,7 +241,7 @@ model_parallel_slopes <- lm(population ~ year + neighbourhood, data = census)
 ```
 
 Even though we only have three points per neighbourhood, let’s calculate
-the *R*<sup>2</sup> for both models
+the *R*<sup>2</sup> and RMSE for both models.
 
 ``` r
 moderndive::get_regression_summaries(model_interactions)
@@ -287,13 +284,13 @@ census %>%
   ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
   geom_point() +
   geom_line(data = predicted_populations,
-             mapping = aes(year, population, color = neighbourhood)) +
+            mapping = aes(year, population, color = neighbourhood)) +
   theme(legend.position = "none")
 ```
 
 ![](preprocess_data_files/figure-gfm/sanity%20check%20plots-1.png)<!-- -->
 
-Looks fine. Two neighbourhoods stand out visually with different growth.
+Looks fine. Two neighbourhoods visually stand out with faster growth.
 Bind the population predictions to the census populations.
 
 ``` r

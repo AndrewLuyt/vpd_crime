@@ -132,9 +132,9 @@ rm(points, UTM.10)
 #' The 22 features are the 22 neighbourhoods. Ensure neighbourhood names match
 #' the crime data
 #+ warning=FALSE
-neighbourhoods <- st_read(SHAPEDATA)
-neighbourhoods$name[neighbourhoods$name == 'Arbutus-Ridge'] <- 'Arbutus Ridge'
-neighbourhoods <- neighbourhoods %>%
+neighbourhoods <- st_read(SHAPEDATA) %>%
+  mutate(name = replace(name, name == "Arbutus-Ridge", "Arbutus Ridge"),
+         name = as_factor(name)) %>%
   select(-geo_point_2d)
 
 #' ## Load Census data
@@ -201,7 +201,7 @@ model_interactions <- lm(population ~ year * neighbourhood, data = census)
 model_parallel_slopes <- lm(population ~ year + neighbourhood, data = census)
 
 #' Even though we only have three points per neighbourhood, let's calculate
-#' the $R^2$ for both models
+#' the $R^2$ and RMSE for both models.
 moderndive::get_regression_summaries(model_interactions)
 moderndive::get_regression_summaries(model_parallel_slopes)
 
@@ -223,10 +223,10 @@ census %>%
   ggplot(aes(year, population, group = neighbourhood, color = neighbourhood)) +
   geom_point() +
   geom_line(data = predicted_populations,
-             mapping = aes(year, population, color = neighbourhood)) +
+            mapping = aes(year, population, color = neighbourhood)) +
   theme(legend.position = "none")
 
-#' Looks fine. Two neighbourhoods stand out visually with different growth.
+#' Looks fine. Two neighbourhoods visually stand out with faster growth.
 #' Bind the population predictions to the census populations.
 populations <-
   rbind(census, predicted_populations) %>%
