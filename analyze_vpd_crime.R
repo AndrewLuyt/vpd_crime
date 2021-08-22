@@ -15,6 +15,7 @@ library(sf)
 library(gganimate)
 library(lubridate)
 library(viridis)
+library(extrafont)
 
 #' ## Load data
 #' Homicide and Offence Against a Person:
@@ -50,7 +51,56 @@ if (file.exists("data/population.Rdata")) {
 
 #' ## Themeing
 default_theme <- theme_set(theme_bw())
-theme_update(title = element_text(face = "bold"))
+theme_update(
+  text = element_text(family="ubuntu"),
+  title = element_text(family = "lato light", size = 16),
+  plot.subtitle = element_text(family = "lato light"),
+  legend.justification = "left",
+  legend.position = "bottom")
+# lato, lato light, mathjax_main, MathJax_Typewriter, Tex Gyre Bonum, Tlwg typist, Ubuntu, urw gothic
+
+
+#' Plot city-wide crimes per 1000 people
+city_population <- populations %>%
+  group_by(year) %>%
+  summarise(citypop = sum(population))
+citywide_crime <- crime %>%
+  group_by(year, type) %>%
+  summarise(incidents = n()) %>%
+  inner_join(city_population, by = "year") %>%
+  mutate(per_1000 = incidents / citypop * 1000)
+citywide_crime %>%
+  filter(year < 2021) %>%
+  ggplot(aes(year, per_1000, col = type, group = type)) +
+  geom_line(size = 2) +
+  labs(title = "Vancouver: Criminal Incidents",
+       x = NULL,
+       y = "Incidents per 1000 people",
+       col = NULL)
+
+#' Create yearly per-1000 crime figures
+per_1000 <- crime %>%
+  filter(year < 2021) %>%
+  inner_join(populations, by = c("neighbourhood", "year")) %>%
+  group_by(neighbourhood, year, type) %>%
+  summarise(population = first(population),
+            general_type = first(general_type),
+            incidents = n()) %>%
+  mutate(per_1000 = incidents / population * 1000)
+
+per_1000 %>%
+  filter(general_type == "Theft") %>%
+  # filter(year > 2015) %>%
+  ggplot(aes(year, per_1000, col = type, group = type)) +
+  geom_line(size = 0.8) +
+  facet_wrap(~neighbourhood, nrow = 4) +
+  guides(col = guide_legend(override.aes = list(size = 3))) +
+  labs(title = "Theft in Vancouver Neighbourhoods / 2003-2020",
+       subtitle = "Per thousand population",
+       x = NULL,
+       y = "Incidents per 1000 people",
+       col = NULL,
+       caption = "Source: VPD Open Data Portal & Census Canada")
 
 crime %>%
   # filter(dt < "2020-08-07") %>%
@@ -66,7 +116,7 @@ crime %>%
   annotate("text", x = date("2011-06-15"), y = 750, label = "Stanley Cup riot\nJune 15, 2011", vjust = 1,
            fontface = "bold") +
   annotate("text", x = date("2005-08-01"), y = 250, hjust = 0, vjust = 1,
-           label = "2008 car-keying crime wave?", fontface = 'bold') +
+           label = "2008 car-keying crime wave..?", fontface = 'bold') +
   theme(legend.position = "none")
 
 #' The 2nd notable spike: a large jump in *Mischief* incidents?
@@ -79,11 +129,38 @@ crime %>%
 #' riot. The *mischief* spike in 2008 is mysterious.. but might be related
 #' to a wave of cars
 crime %>%
+  filter(year >= 2018) %>%
   group_by(day = date(dt), type) %>%
   summarise(incidents = n()) %>%
   ggplot(aes(day, incidents, group = type, color = type)) +
   geom_line() +
-  facet_wrap(~type)
+  geom_smooth(se = FALSE, col = 'black', span =0.5) +
+  facet_wrap(~type) +
+  theme(legend.position = "none") +
+  labs(title = "Vancouver daily crime since 2019")
+
+crime %>%
+  filter(year >= 2018,
+         type %in% c("Other Theft", "Theft from Vehicle", "Theft of Bicycle", "Mischief"),
+         neighbourhood %in% c("Downtown", "Strathcona")) %>%
+  group_by(day = date(dt), type, neighbourhood) %>%
+  summarise(incidents = n()) %>%
+  ggplot(aes(day, incidents, group = type, color = type)) +
+  geom_line() +
+  geom_smooth(se = FALSE, span =0.5) +
+  facet_wrap(~neighbourhood, nrow = 2) +
+  # theme(legend.position = "none") +
+  labs(title = "Vancouver daily crime since 2019")
+
+crime %>%
+  filter(year >= 2019, general_type == "Theft") %>%
+  group_by(day = date(dt)) %>%
+  summarise(incidents = n()) %>%
+  ggplot(aes(day, incidents)) +
+  geom_line() +
+  geom_smooth(se = FALSE, col = 'black', span =0.5) +
+  theme(legend.position = "none") +
+  labs(title = "Vancouver daily crime since 2019")
 
 #' #' Animation
 #' p <- crime %>%
@@ -209,7 +286,7 @@ crime %>%
   geom_bar(position = 'stack', color='black', size=.5, width = .8) +
   coord_flip() +
   scale_x_continuous(n.breaks = 15) +
-  labs(title = "Number of crimes over time", y = NULL, x = NULL)
+  labs(title = "Number of crimes since 2003", y = NULL, x = NULL, fill = NULL)
 
 #' ## Even more detail..
 #' Looking closely we can see that the drop in *theft* in 2020 seems mostly to have been
