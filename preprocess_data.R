@@ -99,7 +99,7 @@ new <- c('Theft', 'Theft', 'Theft', 'Theft',
 crime <- crime %>%
   mutate(general_type = factor(type, old, new))
 
-# create unique IDs.
+# create unique record IDs.
 crime <- tibble::rowid_to_column(crime, "id")
 rm(new, old)
 
@@ -182,10 +182,10 @@ census2006 <- read_csv("data/CensusLocalAreaProfiles2006.csv", skip = 4,
                    neighbourhood == "Vancouver CMA  (Metro Vancouver)", "Metro Vancouver")) %>%
   select(neighbourhood, population, year)
 
-`%nin%` = Negate(`%in%`) # create not-in operator for next chunk
+`%nin%` = Negate(`%in%`) # create a not-in operator for next chunk
 
 census <- rbind(census2016, census2011, census2006) %>%
-  # These are city level, not neighbourhood level
+  # Remove city level records: we only want neighbourhood level
   filter(neighbourhood %nin% c("City of Vancouver", "Metro Vancouver")) %>%
   mutate(neighbourhood = replace(neighbourhood,
                                  which(neighbourhood == "Arbutus-Ridge"),
@@ -204,13 +204,14 @@ rm(census2016, census2011, census2006)
 #' values using a simple linear model. Note that we'll be *extrapolating*
 #' for 2003-2005 and 2017-2021 so these figures should be seen with a more
 #' doubtful eye. This will have to do until the 2021 census
-#' results are released. We use a linear model with interactions: two
+#' results are released. We use a linear model with interactions -- two
 #' neighbourhoods (Downtown in particular) have notably different population
-#' growth over time. For fun we'll test a parallel slopes model too.
+#' growth over time, making this likely a better choice of model.
+#' For fun we'll test a parallel slopes model too.
 model_interactions <- lm(population ~ year * neighbourhood, data = census)
 model_parallel_slopes <- lm(population ~ year + neighbourhood, data = census)
 
-#' Even though we only have three points per neighbourhood, let's calculate
+#' Even though we only have three points per neighborhood, let's calculate
 #' the $R^2$ and RMSE for both models.
 moderndive::get_regression_summaries(model_interactions)
 moderndive::get_regression_summaries(model_parallel_slopes)
